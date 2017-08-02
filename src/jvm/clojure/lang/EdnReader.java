@@ -16,6 +16,7 @@ import java.io.Reader;
 import java.math.BigDecimal;
 import java.math.BigInteger;
 import java.util.ArrayList;
+import java.util.Iterator;
 import java.util.List;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -53,6 +54,7 @@ static
 	dispatchMacros['{'] = new SetReader();
 	dispatchMacros['<'] = new UnreadableReader();
 	dispatchMacros['_'] = new DiscardReader();
+	dispatchMacros[':'] = new NamespaceMapReader();
 	}
 
 static boolean nonConstituent(int ch){
@@ -479,6 +481,55 @@ public static class DiscardReader extends AFn{
 		PushbackReader r = (PushbackReader) reader;
 		read(r, true, null, true, opts);
 		return r;
+	}
+}
+
+public static class NamespaceMapReader extends AFn{
+	public Object invoke(Object reader, Object colon, Object opts) {
+		PushbackReader r = (PushbackReader) reader;
+
+		// Read ns symbol
+		Object sym = read(r, true, null, false, opts);
+		if (!(sym instanceof Symbol) || ((Symbol)sym).getNamespace() != null)
+			throw new RuntimeException("Namespaced map must specify a valid namespace: " + sym);
+		String ns = ((Symbol)sym).getName();
+
+		// Read map
+		int nextChar = read1(r);
+		while(isWhitespace(nextChar))
+			nextChar = read1(r);
+		if('{' != nextChar)
+			throw new RuntimeException("Namespaced map must specify a map");
+		List kvs = readDelimitedList('}', r, true, opts);
+		if((kvs.size() & 1) == 1)
+			throw Util.runtimeException("Namespaced map literal must contain an even number of forms");
+
+		// Construct output map
+		Object[] a = new Object[kvs.size()];
+		Iterator iter = kvs.iterator();
+		for(int i = 0; iter.hasNext(); i += 2) {
+			Object key = iter.next();
+			Object val = iter.next();
+
+			if(key instanceof Keyword) {
+				Keyword kw = (Keyword) key;
+				if (kw.getNamespace() == null) {
+					key = Keyword.intern(ns, kw.getName());
+				} else if (kw.getNamespace().equals("_")) {
+					key = Keyword.intern(null, kw.getName());
+				}
+			} else if(key instanceof Symbol) {
+				Symbol s = (Symbol) key;
+				if (s.getNamespace() == null) {
+					key = Symbol.intern(ns, s.getName());
+				} else if (s.getNamespace().equals("_")) {
+					key = Symbol.intern(null, s.getName());
+				}
+			}
+			a[i] = key;
+			a[i+1] = val;
+		}
+		return RT.map(a);
 	}
 }
 

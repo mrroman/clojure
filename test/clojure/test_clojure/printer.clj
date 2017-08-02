@@ -119,3 +119,24 @@
        #'var-with-meta "#'clojure.test-clojure.printer/var-with-meta"
        #'var-with-type "#'clojure.test-clojure.printer/var-with-type"))
 
+(deftest print-throwable
+  (binding [*data-readers* {'error identity}]
+    (are [e] (= (-> e Throwable->map)
+                (-> e pr-str read-string))
+         (Exception. "heyo")
+         (Throwable. "I can a throwable"
+                     (Exception. "chain 1"
+                                 (Exception. "chan 2")))
+         (ex-info "an ex-info" {:with "its" :data 29})
+         (Exception. "outer"
+                     (ex-info "an ex-info" {:with "data"}
+                              (Error. "less outer"
+                                      (ex-info "the root"
+                                               {:with "even" :more 'data})))))))
+
+(deftest print-ns-maps
+  (is (= "#:user{:a 1}" (binding [*print-namespace-maps* true] (pr-str {:user/a 1}))))
+  (is (= "{:user/a 1}" (binding [*print-namespace-maps* false] (pr-str {:user/a 1}))))
+  (let [date-map (bean (java.util.Date. 0))]
+    (is (= (binding [*print-namespace-maps* true] (pr-str date-map))
+           (binding [*print-namespace-maps* false] (pr-str date-map))))))

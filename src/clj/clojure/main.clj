@@ -53,6 +53,7 @@
   [^StackTraceElement el]
   (let [file (.getFileName el)
         clojure-fn? (and file (or (.endsWith file ".clj")
+                                  (.endsWith file ".cljc")
                                   (= file "NO_SOURCE_FILE")))]
     (str (if clojure-fn?
            (demunge (.getClassName el))
@@ -73,12 +74,14 @@
              *print-meta* *print-meta*
              *print-length* *print-length*
              *print-level* *print-level*
+             *print-namespace-maps* true
              *data-readers* *data-readers*
              *default-data-reader-fn* *default-data-reader-fn*
              *compile-path* (System/getProperty "clojure.compile.path" "classes")
              *command-line-args* *command-line-args*
              *unchecked-math* *unchecked-math*
              *assert* *assert*
+             clojure.spec.alpha/*explain-out* clojure.spec.alpha/*explain-out*
              *1 nil
              *2 nil
              *3 nil
@@ -136,7 +139,7 @@
   [request-prompt request-exit]
   (or ({:line-start request-prompt :stream-end request-exit}
        (skip-whitespace *in*))
-      (let [input (read)]
+      (let [input (read {:read-cond :allow} *in*)]
         (skip-if-eol *in*)
         input)))
 
